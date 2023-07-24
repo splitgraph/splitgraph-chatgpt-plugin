@@ -1,0 +1,18 @@
+{
+  "schema_version": "v1",
+  "name_for_model": "sql_data_delivery_network",
+  "name_for_human": "Splitgraph plugin",
+  "description_for_model": "Plugin for searching through the public datasets found on the Splitgraph data delivery network. These datasets typically originate from open government initiatives and may relate to epidemology, traffic engineering, urban planning, real estate prices, demographical data, etc.",
+  "description_for_human": "Search through thousands of public datasets available on Splitgraph.com",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "http://localhost:3333/.well-known/openapi.json"
+  },
+  "logo_url": "http://localhost:3333/.well-known/logo.png",
+  "contact_email": "hello@splitgraph.com",
+  "legal_info_url": "hello@splitgraph.com"
+}
+

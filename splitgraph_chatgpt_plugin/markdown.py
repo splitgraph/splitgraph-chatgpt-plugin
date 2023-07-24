@@ -87,7 +87,7 @@ def ddn_response_to_markdown(response: DDNResponse) -> str:
 
 def get_repository_urls_as_markdown(repositories: List[Tuple[str, str]]) -> List[str]:
     return [
-        f"* {namespace}/{repository}: {SPLITGRAPH_WWW_URL_PREFIX}{namespace}/{repository}"
+        f"* [{namespace}/{repository}]({SPLITGRAPH_WWW_URL_PREFIX}{namespace}/{repository})"
         for namespace, repository in repositories
     ]
 

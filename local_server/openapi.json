@@ -1,0 +1,44 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Splitgraph Plugin API",
+    "description": "An API for the Splitgraph ChatGPT plugin for querying the Splitgraph Data Delivery Network from chat sessions.",
+    "version": "1.0.0",
+    "servers": [
+      {
+        "url": "http://localhost:3333"
+      }
+    ]
+  },
+  "paths": {
+    "/query": {
+      "get": {
+        "summary": "Query",
+        "description": "Accepts search query objects array each with query. Break down complex questions into sub-questions. Refine results by criteria, e.g. time / source, don't do this often. Split queries if ResponseTooLargeError occurs.",
+        "operationId": "query_splitgraph_ddn",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {}
+            }
+          },
+          "500": {
+            "description": "Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "question",
+            "in": "query",
+            "description": "the input question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

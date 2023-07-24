@@ -22,7 +22,7 @@ class CompletionMessage(BaseModel):
 
 
 class CompletionChoice(BaseModel):
-    finish_reason: Literal["function_call"]
+    finish_reason: str
     message: CompletionMessage
 
 
@@ -53,12 +53,18 @@ FUNCTION_DESCRIPTION = {
 
 
 def parse_completion_response(response: Any) -> Tuple[str, str]:
-    parsed_response = GPTCompletionResponse.parse_obj(response)
-    assert len(parsed_response.choices) == 1
-    return (
-        parsed_response.choices[0].message.function_call.arguments.query,
-        parsed_response.choices[0].message.function_call.arguments.explanation,
-    )
+    try:
+        parsed_response = GPTCompletionResponse.parse_obj(response)
+        assert len(parsed_response.choices) == 1
+        return (
+            parsed_response.choices[0].message.function_call.arguments.query,
+            parsed_response.choices[0].message.function_call.arguments.explanation,
+        )
+    except Exception as e:
+        import pprint
+        pprint.pprint(response)
+        pprint.pprint(e)
+        raise e
 
 
 def get_generated_sql_with_explanation(api_key: str, prompt: str) -> Tuple[str, str]:
