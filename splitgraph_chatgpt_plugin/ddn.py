@@ -1,9 +1,9 @@
 # based on: https://python.langchain.com/en/latest/modules/chains/examples/sqlite.html
 import json
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, TypedDict, Literal, Union
 import requests
-from pydantic import BaseModel
-from typing import TypedDict
+from pydantic import BaseModel, Field, parse_obj_as
+from typing_extensions import Annotated
 
 # The constructor of the SQLDatabase base class calls SQLAlchemy's inspect()
 # which fails on the DDN since some of the required introspection tables are
@@ -15,6 +15,7 @@ from typing import TypedDict
 # SplitgraphInspector instance
 
 GRAPHQL_API_URL = "https://api.splitgraph.com/gql/cloud/unified/graphql"
+SPLITGRAPH_DDN_URL = "https://data.splitgraph.com/sql/query/ddn"
 
 GRAPHQL_QUERIES = {
     "GetNamespaceRepos": """
@@ -126,3 +127,49 @@ def get_repo_tables(namespace: str, repository: str) -> List[TableInfo]:
             "GetRepoTables", {"namespace": namespace, "repository": repository}
         )["data"]["repository"]["latestTables"]["nodes"]
     ]
+
+
+class DDNResponseField(BaseModel):
+    name: str
+    tableID: int
+    columnID: int
+    dataTypeID: int
+    dataTypeSize: int
+    dataTypeModifier: int
+    format: str
+    formattedType: str
+
+
+class DDNResponseSuccess(BaseModel):
+    success: Literal[True]
+    command: str
+    rowCount: int
+    rows: List[Dict[str, Any]]
+    fields: List[DDNResponseField]
+    executionTime: str
+    executionTimeHighRes: str
+
+
+class DDNResponseFailure(BaseModel):
+    success: Literal[False]
+    error: str
+
+
+DDNResponse = Annotated[
+    Union[DDNResponseSuccess, DDNResponseFailure], Field(discriminator="success")
+]
+
+
+def ddn_query(sql) -> DDNResponse:
+    return parse_obj_as(
+        DDNResponse,
+        requests.post(
+            SPLITGRAPH_DDN_URL,
+            headers={
+                "Accept-Encoding": "gzip, deflate, br",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            data=json.dumps({"sql": sql}),
+        ).json(),
+    )

@@ -16,7 +16,7 @@ from unstructured.partition.md import partition_md  # type: ignore
 
 from .persistence import connect, get_db_connection_string, get_embedding_store
 from .ddn import get_repo_list, RepositoryInfo
-from .repo_to_md import repository_info_to_markdown
+from .markdown import repository_info_to_markdown
 
 EMBEDDING_CHUNK_SIZE = 50
 DOCUMENT_CHUNK_BYTES = 1000

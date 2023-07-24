@@ -2,46 +2,54 @@
 import os
 from typing import List, Tuple
 
-from .gpt_completion import GPT_FUNCTION_NAME, get_generated_sql_with_explanation
+from .markdown import (
+    ddn_response_to_markdown,
+    get_repository_urls_as_markdown,
+    get_query_editor_url,
+)
 
-from .repo_to_md import table_info_to_markdown
+from .gpt import generate_gpt_prompt, get_generated_sql_with_explanation
 
 from .persistence import find_repos, get_db_connection_string, get_embedding_store
 
-from .ddn import get_repo_tables
+from .ddn import DDNResponse, ddn_query
 
-GENERATE_SQL_PROMPT = """
-You are a PostgreSQL expert. Create a syntactically correct PostgreSQL SQL query which answers the question,
+RESPONSE_TEMPLATE = """
+Query:
 "{question}"
-Query for at most 5 results using the LIMIT clause as per PostgreSQL.
-Never query for all columns from a table. You must query only the columns that are needed to answer the question.
-Wrap each column name in double quotes (") to denote them as delimited identifiers.
-Pay attention to use only the column names you can see in the tables below.
-Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table.
-Pay attention to use CURRENT_DATE function to get the current date, if the question involves "today".
-Always use the fully qualified table name.
-You may use only the following tables in your query:
 
-{tables}
+Generated SQL:
+{sql}
 
-Call the {function_name} function with the generated SQL query, and an explanation of why this table was chosen for the query.
-"""
+Explanation of SQL:
+{explanation}
+
+Query results:
+{query_response}
+
+Polish and rerun this query on Splitgraph at:
+{query_editor_url}
+
+Browse related repositories:
+{repository_page_urls}
+
+""".strip()
 
 
-def generate_gpt_prompt(repositories: List[Tuple[str, str]]) -> str:
-    table_infos_markdown: List[str] = []
-    for namespace, repository in repositories:
-        for table_info in get_repo_tables(namespace, repository):
-            table_infos_markdown.append(
-                table_info_to_markdown(
-                    namespace, repository, table_info, emit_header=False
-                )
-            )
-
-    return GENERATE_SQL_PROMPT.format(
+def generate_response_text(
+    question: str,
+    sql: str,
+    explanation: str,
+    query_response: DDNResponse,
+    repositories: List[Tuple[str, str]],
+) -> str:
+    return RESPONSE_TEMPLATE.format(
         question=question,
-        tables="\n".join(table_infos_markdown),
-        function_name=GPT_FUNCTION_NAME,
+        sql=sql,
+        explanation=explanation,
+        query_response=ddn_response_to_markdown(query_response),
+        repository_page_urls="\n".join(get_repository_urls_as_markdown(repositories)),
+        query_editor_url=get_query_editor_url(sql),
     )
 
 
@@ -56,11 +64,12 @@ def generate_gpt_prompt(repositories: List[Tuple[str, str]]) -> str:
 # within that namespace.
 collection = "repository_embeddings"
 question = "What is the most expensive residential neighborhood in Chicago?"
+openai_api_key = os.getenv("OPENAI_API_KEY")
 connection_string = get_db_connection_string()
 vstore = get_embedding_store(collection, connection_string)
 repositories = find_repos(vstore, question)
-prompt = generate_gpt_prompt(repositories)
-api_key = os.getenv("OPENAI_API_KEY")
-query, explanation = get_generated_sql_with_explanation(api_key, prompt)
-print(query)
-print(explanation)
+prompt = generate_gpt_prompt(repositories, question)
+sql, explanation = get_generated_sql_with_explanation(openai_api_key, prompt)
+ddn_response = ddn_query(sql)
+print(generate_response_text(question, sql, explanation, ddn_response, repositories))
+# plugin_response = generate_response(query, explanation, ddn_results['rows'])
