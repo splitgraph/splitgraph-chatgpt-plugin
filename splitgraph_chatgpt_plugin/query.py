@@ -1,14 +1,15 @@
 # from: https://python.langchain.com/en/latest/modules/chains/examples/sqlite.html
+import json
+import pprint
 from typing import List, Optional, Tuple, Union
 from langchain.vectorstores import VectorStore
 from .markdown import (
-    ddn_response_to_markdown,
     ddn_resultset_to_markdown,
     get_repository_urls_as_markdown,
     get_query_editor_url,
 )
 
-from .gpt import GPTError, GPTErrorType, generate_gpt_prompt, request_gpt_completion
+from .gpt import GPT_FUNCTION_NAME, FunctionCall, GPTError, GPTErrorType, GPTMessage, GPTMessageAssistant, GPTMessageFunction, GPTMessageUser, continue_gpt_session, generate_gpt_prompt
 
 from .persistence import find_repos
 
@@ -43,12 +44,19 @@ INFORM the user that execution of the SQL query resulted in the following error 
 INSTRUCT the user to fix the malformed SQL query using the Splitgraph Query Editor at: {query_editor_url}
 """.strip()
 
-GPT_ERROR_RESPONSE_TEMPLATE = """
+GPT_GENERAL_ERROR_RESPONSE_TEMPLATE = """
 INFORM the user that generation of the SQL query resulted in the following error in backticks:
 `{error}`
 
 INSTRUCT the user to browse related repositories on Splitgraph:
 {repository_page_urls}
+""".strip()
+
+GPT_SQL_GENERATION_ERROR_RESPONSE_TEMPLATE = """
+INFORM the user that generation of the SQL query was not possible due to the following:
+{error}
+
+INSTRUCT the user to try a different question.
 """.strip()
 
 
@@ -71,35 +79,61 @@ def generate_ddn_failure_response_text(sql:str, ddn_response:DDNResponseFailure)
         query_editor_url=get_query_editor_url(sql),
     )
 
-def generate_gpt_failure_response_text(error:GPTError, repositories: List[Tuple[str, str]])->str:
+def generate_gpt_general_failure_response_text(error:GPTError, repositories: List[Tuple[str, str]])->str:
     error_message = str(error)
     if (error.error_type == GPTErrorType.INVALID_FUNCTION_CALL_ARGUMENTS):
-         error_message = "Unable to generate an SQL query for your question, please try again!"
-    return GPT_ERROR_RESPONSE_TEMPLATE.format(
+         error_message = error.message
+    return GPT_GENERAL_ERROR_RESPONSE_TEMPLATE.format(
         error=error_message,
         repository_page_urls="\n".join(get_repository_urls_as_markdown(repositories))
     )
 
+def generate_gpt_sql_generation_failure_response_text(error:GPTError)->str:
+    error_message = str(error)
+    return GPT_SQL_GENERATION_ERROR_RESPONSE_TEMPLATE.format(
+        error=error_message,
+    )
 
-def attempt_query(openai_api_key:str, prompt:str, repositories: List[Tuple[str, str]], retries_left=3):
-        maybe_sql = request_gpt_completion(openai_api_key, prompt)
-        # retry the entire process if the SQL query could not be generated
+DEFAULT_RETRY_ATTEMPTS = 3
+
+def attempt_query(openai_api_key:str, prompt:str, repositories: List[Tuple[str, str]], messages:Optional[List[GPTMessage]]=None, retries_left=DEFAULT_RETRY_ATTEMPTS):
+        pprint.pprint(messages)
+        # If no messages were passed in, consider this attempt as starting a brand new GPT session
+        if messages is None:
+            messages = [GPTMessageUser(role="user", content=prompt)]
+        maybe_sql = continue_gpt_session(openai_api_key, messages)
         if isinstance(maybe_sql, GPTError):
             print(f"Retries left: {retries_left} failed with GPT error {str(maybe_sql)}")
-            if retries_left > 0:
-                 return attempt_query(openai_api_key, prompt, repositories, retries_left - 1)
-            else:
-                 return generate_gpt_failure_response_text(maybe_sql, repositories)
+            # If we have run out of retry attempts, fail
+            if retries_left < 1:
+                 return generate_gpt_general_failure_response_text(maybe_sql, repositories)
+            # If GPT returned with a failure to generate a query (because eg. the query cannot be
+            # fixed), then give up.
+            if maybe_sql.error_type == GPTErrorType.SQL_GENERATION_FAILURE:
+                return generate_gpt_sql_generation_failure_response_text(maybe_sql)
+            # If this is a later iteration on a query and the context length has been exhausted
+            # then later attempts will probably also overshoot
+            if len(messages) > 1 and maybe_sql.error_type == GPTErrorType.CONTEXT_TOKENS_EXHAUSTED:
+                return generate_gpt_general_failure_response_text(maybe_sql, repositories)
+            # Otherwise retry with a newly generated SQL query
+            return attempt_query(openai_api_key, prompt, repositories, None, retries_left - 1)
+        # Attempt to pretty-print the SQL query using pglast
         prettified_sql = prettify_sql(maybe_sql)
+        # Attempt to run the execute the generated sql query on the DDN
         ddn_response = ddn_query(prettified_sql)
-        # retry the entire process if the DDN returns an error
         if isinstance(ddn_response, DDNResponseFailure):
             print(f"Retries left: {retries_left} failed with DDN error {str(ddn_response)}")
             if retries_left > 0:
-                 return attempt_query(openai_api_key, prompt, repositories, retries_left - 1)
+                 # If the DDN responds with an error message then add this error
+                # to the GPT context so GPT will generate a new query and try again
+                 messages.extend([
+                      GPTMessageAssistant(role="assistant",content=None,function_call=FunctionCall(name=GPT_FUNCTION_NAME, arguments=json.dumps({"query": maybe_sql}))),
+                      GPTMessageFunction(role="function", name=GPT_FUNCTION_NAME, content=json.dumps({"error": ddn_response.error})),
+                      GPTMessageUser(role="user", content="Regenerate the SQL query fixing this error.")
+                 ])
+                 return attempt_query(openai_api_key, prompt, repositories, messages, retries_left - 1)
             else:
                  return generate_ddn_failure_response_text(prettified_sql, ddn_response)
-
         return generate_success_response_text(prettified_sql, ddn_response, repositories)
 
 def generate_full_response(question:str, openai_api_key:str, vstore: VectorStore)->str:

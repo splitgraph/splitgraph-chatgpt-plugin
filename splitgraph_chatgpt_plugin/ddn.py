@@ -3,7 +3,7 @@ import json
 from typing import Any, Dict, List, NamedTuple, Optional, TypedDict, Literal, Union
 import requests
 from pydantic import BaseModel, Field, parse_obj_as
-from typing_extensions import Annotated
+from typing import Annotated
 from pglast import prettify
 
 # The constructor of the SQLDatabase base class calls SQLAlchemy's inspect()
