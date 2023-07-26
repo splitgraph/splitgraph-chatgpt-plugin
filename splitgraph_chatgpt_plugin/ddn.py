@@ -4,6 +4,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, TypedDict, Literal, Un
 import requests
 from pydantic import BaseModel, Field, parse_obj_as
 from typing_extensions import Annotated
+from pglast import prettify
 
 # The constructor of the SQLDatabase base class calls SQLAlchemy's inspect()
 # which fails on the DDN since some of the required introspection tables are
@@ -159,9 +160,10 @@ DDNResponse = Annotated[
     Union[DDNResponseSuccess, DDNResponseFailure], Field(discriminator="success")
 ]
 
+DDN_ERROR_PREFIX = "error: "
 
 def ddn_query(sql) -> DDNResponse:
-    return parse_obj_as(
+    parsed_response = parse_obj_as(
         DDNResponse,
         requests.post(
             SPLITGRAPH_DDN_URL,
@@ -173,3 +175,14 @@ def ddn_query(sql) -> DDNResponse:
             data=json.dumps({"sql": sql}),
         ).json(),
     )
+    # remove unnecessary "error: " prefix from errors when present
+    if isinstance(parsed_response, DDNResponseFailure) and parsed_response.error.startswith(DDN_ERROR_PREFIX):
+        parsed_response.error = parsed_response.error[len(DDN_ERROR_PREFIX):]
+    return parsed_response
+
+# attempt to prettify sql, leave as-is upon failure
+def prettify_sql(sql:str)->str:
+    try:
+      return prettify(sql)
+    except:
+        return sql

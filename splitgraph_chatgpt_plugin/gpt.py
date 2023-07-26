@@ -1,19 +1,19 @@
+from enum import Enum
 import os
-from typing import Any, List, Literal, Tuple
+from typing import Any, List, Literal, Tuple, Union
 
 import openai
 from pydantic import BaseModel, Json
+from pydantic.error_wrappers import ValidationError
 from .markdown import table_info_to_markdown
 from .ddn import get_repo_tables
 
 
 class FunctionArguments(BaseModel):
     query: str
-    explanation: str
-
 
 class CompletionMessageFunctionCall(BaseModel):
-    name: Literal["return_sql_query_with_explanation"]
+    name: Literal["sql"]
     arguments: Json[FunctionArguments]
 
 
@@ -30,44 +30,54 @@ class GPTCompletionResponse(BaseModel):
     choices: List[CompletionChoice]
 
 
-GPT_FUNCTION_NAME = "return_sql_query_with_explanation"
+GPT_FUNCTION_NAME = "sql"
 
 FUNCTION_DESCRIPTION = {
     "name": GPT_FUNCTION_NAME,
-    "description": "Accepts a PostgreSQL dialect SQL query and an explanation of how the query works",
+    "description": "Accepts a PostgreSQL dialect SQL query.",
     "parameters": {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "A PostgreSQL dialect SQL query which provides the answer to the question",
-            },
-            "explanation": {
-                "type": "string",
-                "description": "Explanation of how the SQL query works",
-            },
+                "description": "A PostgreSQL dialect SQL query.",
+            }
         },
-        "required": ["query", "explanation"],
+        "required": ["query"],
     },
 }
 
+GPTErrorType = Enum('GPTErrorType', ['INVALID_FUNCTION_CALL_ARGUMENTS', 'UNKNOWN'])
 
-def parse_completion_response(response: Any) -> Tuple[str, str]:
+
+class GPTError(Exception):
+
+    error_type: GPTErrorType
+
+    def __init__(self, message:str, error_type: GPTErrorType):
+        super().__init__(message)
+        self.error_type = error_type
+
+def parse_completion_response(response: Any) -> Union[str, GPTError]:
     try:
         parsed_response = GPTCompletionResponse.parse_obj(response)
         assert len(parsed_response.choices) == 1
-        return (
-            parsed_response.choices[0].message.function_call.arguments.query,
-            parsed_response.choices[0].message.function_call.arguments.explanation,
-        )
-    except Exception as e:
+        return parsed_response.choices[0].message.function_call.arguments.query
+    except ValidationError as validation_error:
+        errors = validation_error.errors()
+        for error in errors:
+            if error == {'loc': ('choices', 0, 'message', 'function_call', 'arguments'),
+                'msg': 'Invalid JSON',
+                'type': 'value_error.json'}:
+                return GPTError(error['msg'], GPTErrorType.INVALID_FUNCTION_CALL_ARGUMENTS)
+        return GPTError("Unknown validation error " + error['msg'], GPTErrorType.UNKNOWN)
+    except Exception as other_error:
         import pprint
-        pprint.pprint(response)
-        pprint.pprint(e)
-        raise e
+        pprint.pprint(other_error)
+        return GPTError("Received error " + str(other_error), GPTErrorType.UNKNOWN)
 
 
-def get_generated_sql_with_explanation(api_key: str, prompt: str) -> Tuple[str, str]:
+def request_gpt_completion(api_key: str, prompt: str) -> Union[str, GPTError]:
     return parse_completion_response(
         openai.ChatCompletion.create(
             api_key=api_key,
@@ -77,6 +87,7 @@ def get_generated_sql_with_explanation(api_key: str, prompt: str) -> Tuple[str, 
         )
     )
 
+RETRY_COUNT = 3
 
 GENERATE_SQL_PROMPT = """
 You are a PostgreSQL expert. Create a syntactically correct PostgreSQL SQL query which answers the question,
@@ -92,7 +103,7 @@ You may use only the following tables in your query:
 
 {tables}
 
-Call the {function_name} function with the generated SQL query, and an explanation of why this table was chosen for the query.
+Call the {function_name} function with the generated SQL query.
 """
 
 

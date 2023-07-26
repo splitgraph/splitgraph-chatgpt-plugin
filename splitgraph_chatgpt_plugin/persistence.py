@@ -46,7 +46,7 @@ def get_embedding_store(
     return get_embedding_store_pgvector(collection, connection_string)
 
 
-def find_repos(vstore: VectorStore, query: str, limit=6) -> List[Tuple[str, str]]:
+def find_repos(vstore: VectorStore, query: str, limit=4) -> List[Tuple[str, str]]:
     results = vstore.similarity_search_with_score(query, limit)
     # sort by relevance, returning most relevant repository first
     results.sort(key=lambda a: a[1], reverse=True)

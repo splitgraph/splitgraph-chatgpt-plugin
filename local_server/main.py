@@ -57,7 +57,8 @@ async def query_main(question: str|None=None):
     try:
         return Response(content=generate_full_response(question, openai_api_key, vstore), media_type="text/plain")
     except Exception as e:
-        print(e)
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Internal Service Error")
 
 
