@@ -10,36 +10,45 @@ from .markdown import table_info_to_markdown
 from .ddn import get_repo_tables
 import pprint
 
-GPT_MODEL = "gpt-4-0613" #"gpt-3.5-turbo-0613"
+GPT_MODEL = "gpt-4-0613"  # "gpt-3.5-turbo-0613"
+
 
 class FunctionArguments(BaseModel):
     query: str
+
 
 class FunctionCall(BaseModel):
     name: Literal["sql"]
     arguments: str
 
+
 class GPTMessageUser(BaseModel):
     role: Literal["user"]
     content: str
+
 
 class GPTMessageAssistant(BaseModel):
     role: Literal["assistant"]
     function_call: Optional[FunctionCall]
     content: Optional[str]
 
+
 class GPTMessageFunction(BaseModel):
     role: Literal["function"]
     name: str
     content: str
 
+
 GPTMessage = Annotated[
-    Union[GPTMessageUser, GPTMessageAssistant, GPTMessageFunction], Field(discriminator="role")
+    Union[GPTMessageUser, GPTMessageAssistant, GPTMessageFunction],
+    Field(discriminator="role"),
 ]
+
 
 class CompletionChoice(BaseModel):
     finish_reason: str
     message: GPTMessage
+
 
 class GPTCompletionResponse(BaseModel):
     choices: List[CompletionChoice]
@@ -62,18 +71,28 @@ FUNCTION_DESCRIPTION = {
     },
 }
 
-GPTErrorType = Enum('GPTErrorType', ['INVALID_FUNCTION_CALL_ARGUMENTS', 'SQL_GENERATION_FAILURE', 'CONTEXT_TOKENS_EXHAUSTED', 'GPT_UNAVAILABLE', 'RATE_LIMIT', 'UNKNOWN'])
+GPTErrorType = Enum(
+    "GPTErrorType",
+    [
+        "INVALID_FUNCTION_CALL_ARGUMENTS",
+        "SQL_GENERATION_FAILURE",
+        "CONTEXT_TOKENS_EXHAUSTED",
+        "GPT_UNAVAILABLE",
+        "RATE_LIMIT",
+        "UNKNOWN",
+    ],
+)
 
 
 class GPTError(Exception):
-
     message: str
     error_type: GPTErrorType
 
-    def __init__(self, message:str, error_type: GPTErrorType):
+    def __init__(self, message: str, error_type: GPTErrorType):
         super().__init__(message)
         self.message = message
         self.error_type = error_type
+
 
 def parse_completion_response(response: Any) -> Union[str, GPTError]:
     try:
@@ -83,21 +102,42 @@ def parse_completion_response(response: Any) -> Union[str, GPTError]:
         assert len(parsed_response.choices) == 1
         assert isinstance(parsed_response.choices[0].message, GPTMessageAssistant)
         # an sql query was generated, return it
-        if parsed_response.choices[0].finish_reason == "function_call" and parsed_response.choices[0].message.function_call is not None:
+        if (
+            parsed_response.choices[0].finish_reason == "function_call"
+            and parsed_response.choices[0].message.function_call is not None
+        ):
             # attempt to parse function arguments as JSON
             try:
                 # replace newlines with spaces since that's the #1 reason GPT returns invalid JSON after
                 # context exhaustion
-                arguments = json.loads(parsed_response.choices[0].message.function_call.arguments.replace('\n', ' '))
+                arguments = json.loads(
+                    parsed_response.choices[0].message.function_call.arguments.replace(
+                        "\n", " "
+                    )
+                )
                 return FunctionArguments.parse_obj(arguments).query
             except json.decoder.JSONDecodeError as json_error:
-                return GPTError('Function arguments are not valid JSON', GPTErrorType.INVALID_FUNCTION_CALL_ARGUMENTS)
+                return GPTError(
+                    "Function arguments are not valid JSON",
+                    GPTErrorType.INVALID_FUNCTION_CALL_ARGUMENTS,
+                )
         if parsed_response.choices[0].finish_reason == "length":
-            return GPTError(parsed_response.choices[0].message.content or 'Maximum LLM context length exceeded', GPTErrorType.CONTEXT_TOKENS_EXHAUSTED)
+            return GPTError(
+                parsed_response.choices[0].message.content
+                or "Maximum LLM context length exceeded",
+                GPTErrorType.CONTEXT_TOKENS_EXHAUSTED,
+            )
         if parsed_response.choices[0].finish_reason == "stop":
-            return GPTError(parsed_response.choices[0].message.content, GPTErrorType.SQL_GENERATION_FAILURE)
+            return GPTError(
+                parsed_response.choices[0].message.content
+                or "Unable to generate SQL query",
+                GPTErrorType.SQL_GENERATION_FAILURE,
+            )
         # GPT failed to generate a query
-        return GPTError(parsed_response.choices[0].message.content, GPTErrorType.UNKNOWN)
+        return GPTError(
+            parsed_response.choices[0].message.content or "Unknown error occurred",
+            GPTErrorType.UNKNOWN,
+        )
     # pydantic validation error
     except ValidationError as validation_error:
         errors = validation_error.errors()
@@ -108,7 +148,7 @@ def parse_completion_response(response: Any) -> Union[str, GPTError]:
         return GPTError(str(other_error), GPTErrorType.UNKNOWN)
 
 
-def gpt_completion(api_key: str, messages:List[GPTMessage]) -> Any:
+def gpt_completion(api_key: str, messages: List[GPTMessage]) -> Any:
     try:
         return openai.ChatCompletion.create(
             api_key=api_key,
@@ -125,12 +165,17 @@ def gpt_completion(api_key: str, messages:List[GPTMessage]) -> Any:
         return GPTError(str(e), GPTErrorType.CONTEXT_TOKENS_EXHAUSTED)
     except openai.error.RateLimitError as e:
         return GPTError(str(e), GPTErrorType.RATE_LIMIT)
-def continue_gpt_session(api_key: str, messages:List[GPTMessage]) -> Union[str, GPTError]:
+
+
+def continue_gpt_session(
+    api_key: str, messages: List[GPTMessage]
+) -> Union[str, GPTError]:
     # The conversation begins with the "user" (which in this case is the plugin) announcing the prompt
     completion = gpt_completion(api_key, messages)
     if isinstance(completion, GPTError):
         return completion
     return parse_completion_response(completion)
+
 
 RETRY_COUNT = 3
 

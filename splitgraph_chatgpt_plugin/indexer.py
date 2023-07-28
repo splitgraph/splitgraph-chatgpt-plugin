@@ -1,5 +1,5 @@
 # from: https://python.langchain.com/en/latest/modules/indexes/vectorstores/examples/pgvector.html
-
+import sys
 from io import StringIO
 from typing import List
 from langchain.text_splitter import CharacterTextSplitter
@@ -13,10 +13,12 @@ import sqlalchemy
 
 from unstructured.__version__ import __version__ as __unstructured_version__  # type: ignore
 from unstructured.partition.md import partition_md  # type: ignore
+from splitgraph_chatgpt_plugin.config import DOCUMENT_COLLECTION_NAME
 
-from .persistence import connect, get_db_connection_string, get_embedding_store
+from .persistence import connect, get_embedding_store
 from .ddn import get_repo_list, RepositoryInfo
 from .markdown import repository_info_to_markdown
+from .config import get_db_connection_string, get_openai_api_key
 
 EMBEDDING_CHUNK_SIZE = 50
 DOCUMENT_CHUNK_BYTES = 1000
@@ -79,13 +81,15 @@ def prepare_repository_info_documents(
     return text_splitter.split_documents(documents)
 
 
-def main():
+def main() -> None:
     # set repo_index_limit to an integer to only index the first N repos.
     repo_index_limit = None
-    collection = "repository_embeddings"
-    namespace = "cityofchicago"
+    collection = DOCUMENT_COLLECTION_NAME
+    namespace = sys.argv[1]
     connection_string = get_db_connection_string()
-    vstore = get_embedding_store(collection, connection_string)
+    vstore = get_embedding_store(
+        collection, connection_string, get_openai_api_key(), 100000
+    )
     print(f"Indexing repositories in namespace {namespace}")
     repo_list = get_repo_list(namespace)
     repository_info_documents: List[Document] = []

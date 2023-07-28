@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Response
 from starlette.responses import FileResponse
 
 from fastapi.middleware.cors import CORSMiddleware
+from splitgraph_chatgpt_plugin.gpt import get_openai_api_key
 
 from splitgraph_chatgpt_plugin.persistence import get_db_connection_string, get_embedding_store
 from splitgraph_chatgpt_plugin.query import generate_full_response
@@ -66,8 +67,8 @@ async def query_main(question: str|None=None):
 async def startup():
     global openai_api_key
     global vstore
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    vstore = get_embedding_store(collection, get_db_connection_string())
+    openai_api_key = get_openai_api_key()
+    vstore = get_embedding_store(collection, get_db_connection_string(), openai_api_key)
 
 
 def start():
