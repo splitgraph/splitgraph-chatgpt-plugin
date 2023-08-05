@@ -53,4 +53,7 @@ DDNResponse = Annotated[
 class FindRelevantTablesResponse(BaseModel):
     tables: List[TableInfo]
 
-
+class RunSQLResponse(BaseModel):
+    error: Optional[str]
+    rows: Optional[List[Any]]
+    query_editor_url: str

@@ -10,3 +10,4 @@ def get_openai_api_key():
 
 
 DOCUMENT_COLLECTION_NAME = "repository_embeddings"
+SPLITGRAPH_WWW_URL_PREFIX = "https://www.splitgraph.com/"

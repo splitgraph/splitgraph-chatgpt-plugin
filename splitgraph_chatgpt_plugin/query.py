@@ -8,7 +8,6 @@ from .models import FindRelevantTablesResponse
 from .markdown import (
     ddn_resultset_to_markdown,
     get_repository_urls_as_markdown,
-    get_query_editor_url,
 )
 
 from .gpt import (
@@ -35,7 +34,8 @@ from .models import (
 from .ddn import (
     ddn_query,
     prettify_sql,
-    get_table_infos
+    get_table_infos,
+    get_query_editor_url
 )
 
 SUCCESSFUL_RESPONSE_TEMPLATE = """

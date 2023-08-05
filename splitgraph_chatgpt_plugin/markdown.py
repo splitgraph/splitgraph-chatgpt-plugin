@@ -1,7 +1,7 @@
 from typing import Any, List, Set, Tuple
-from .models import DDNResponse, DDNResponseSuccess, RepositoryInfo, TableColumn, TableInfo
 
-SPLITGRAPH_WWW_URL_PREFIX = "https://www.splitgraph.com/"
+from .config import SPLITGRAPH_WWW_URL_PREFIX
+from .models import DDNResponse, DDNResponseSuccess, RepositoryInfo, TableColumn, TableInfo
 
 
 REPOSITORY_DESCRIPTION = """
@@ -90,9 +90,3 @@ def get_repository_urls_as_markdown(repositories: List[Tuple[str, str]]) -> List
         f"* [{namespace}/{repository}]({SPLITGRAPH_WWW_URL_PREFIX}{namespace}/{repository})"
         for namespace, repository in repositories
     ]
-
-
-def get_query_editor_url(sql: str) -> str:
-    import urllib.parse
-
-    return f"{SPLITGRAPH_WWW_URL_PREFIX}query?sqlQuery={urllib.parse.quote_plus(sql)}"
