@@ -187,6 +187,10 @@ def ddn_query(sql) -> DDNResponse:
 # attempt to prettify sql, leave as-is upon failure
 def prettify_sql(sql: str) -> str:
     try:
+        # TODO: don't cut table names at 63 characters
+        # Currently, prettify() breaks the query because
+        # splitgraph schema and table names often exceed
+        # 63 characters.
         return prettify(sql)
     except:
         return sql

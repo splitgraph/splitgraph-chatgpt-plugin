@@ -7,9 +7,9 @@ from fastapi import FastAPI, HTTPException, Response
 from starlette.responses import FileResponse
 
 from fastapi.middleware.cors import CORSMiddleware
-from splitgraph_chatgpt_plugin.gpt import get_openai_api_key
+from splitgraph_chatgpt_plugin.config import get_openai_api_key, get_db_connection_string
 
-from splitgraph_chatgpt_plugin.persistence import get_db_connection_string, get_embedding_store
+from splitgraph_chatgpt_plugin.persistence import get_embedding_store
 from splitgraph_chatgpt_plugin.query import generate_full_response
 
 

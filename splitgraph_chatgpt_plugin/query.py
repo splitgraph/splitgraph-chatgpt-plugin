@@ -154,8 +154,8 @@ def attempt_query(
         return attempt_query(
             openai_api_key, prompt, repositories, None, retries_left - 1
         )
-    # Attempt to pretty-print the SQL query using pglast
-    prettified_sql = prettify_sql(maybe_sql)
+    # DON'T attempt to pretty-print the SQL query using pglast
+    prettified_sql = maybe_sql # prettify_sql(maybe_sql)
     # Attempt to run the execute the generated sql query on the DDN
     ddn_response = ddn_query(prettified_sql)
     if isinstance(ddn_response, DDNResponseFailure):
