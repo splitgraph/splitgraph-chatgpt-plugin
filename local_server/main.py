@@ -8,10 +8,11 @@ from starlette.responses import FileResponse
 
 from fastapi.middleware.cors import CORSMiddleware
 from splitgraph_chatgpt_plugin.config import get_openai_api_key, get_db_connection_string
+from splitgraph_chatgpt_plugin.models import FindRelevantTablesResponse
 
 from splitgraph_chatgpt_plugin.persistence import get_embedding_store
 from splitgraph_chatgpt_plugin.query import generate_full_response
-
+import pprint
 
 app = FastAPI()
 collection = "repository_embeddings"
@@ -51,12 +52,13 @@ async def get_openapi(request):
     return FileResponse(file_path, media_type="text/json")
 
 
-@app.get("/query")
-async def query_main(question: str|None=None):
-    global openai_api_key
+@app.get("/findRelevantTables", response_model=FindRelevantTablesResponse)
+async def query_main(prompt: str|None=None):
     global vstore
     try:
-        return Response(content=generate_full_response(question, openai_api_key, vstore), media_type="text/plain")
+        response = generate_full_response(prompt, vstore)
+        pprint.pprint(response)
+        return response
     except Exception as e:
         import traceback
         print(traceback.format_exc())

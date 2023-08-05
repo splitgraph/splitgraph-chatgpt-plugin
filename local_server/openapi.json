@@ -11,16 +11,20 @@
     ]
   },
   "paths": {
-    "/query": {
+    "/findRelevantTables": {
       "get": {
-        "summary": "Query",
+        "operationId": "findRelevantTables",
+        "summary": "Find tables in the Splitgraph Data Delivery Network relevant to the user's prompt.",
         "description": "Accepts search query objects array each with query. Break down complex questions into sub-questions. Refine results by criteria, e.g. time / source, don't do this often. Split queries if ResponseTooLargeError occurs.",
-        "operationId": "query_splitgraph_ddn",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
-              "text/plain": {}
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindRelevantTablesResponse"
+                }
+              }
             }
           },
           "500": {
@@ -29,15 +33,59 @@
         },
         "parameters": [
           {
-            "name": "question",
+            "name": "prompt",
             "in": "query",
-            "description": "the input question",
+            "description": "the input prompt from the user",
             "required": true,
             "schema": {
               "type": "string"
             }
           }
         ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FindRelevantTablesResponse": {
+        "title": "FindRelevantTablesResponse",
+        "type": "object",
+        "required": ["tables"],
+        "properties": {
+          "tables": {
+            "title": "Tables",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableInfo"
+            }
+          }
+        }
+      },
+      "TableInfo": {
+        "title": "TableInfo",
+        "type": "object",
+        "required": ["name", "columns"],
+        "properties": {
+          "name": {"type": "string"},
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableColumn"
+            }
+          }
+        }
+      },
+      "TableColumn": {
+        "title": "TableColumn",
+        "type": "object",
+        "required": ["name", "postgresql_type", "is_primary_key"],
+        "properties": {
+          "ordinal": {"type": "number"},
+          "name": {"type": "string"},
+          "postgresql_type": {"type": "string"},
+          "is_primary_key": {"type": "boolean"},
+          "comment": {"type": "string"}
+        }
       }
     }
   }

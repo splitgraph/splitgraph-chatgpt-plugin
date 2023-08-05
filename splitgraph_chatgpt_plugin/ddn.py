@@ -1,10 +1,13 @@
 # based on: https://python.langchain.com/en/latest/modules/chains/examples/sqlite.html
 import json
-from typing import Any, Dict, List, NamedTuple, Optional, TypedDict, Literal, Union
+from typing import Any, Dict, List, Tuple
 import requests
-from pydantic import BaseModel, Field, parse_obj_as
-from typing import Annotated
-from pglast import prettify  # type: ignore
+from pydantic import parse_obj_as
+from pglast import prettify
+
+from .models import DDNResponse, DDNResponseFailure, RepositoryInfo, TableColumn, TableInfo
+import itertools
+
 
 # The constructor of the SQLDatabase base class calls SQLAlchemy's inspect()
 # which fails on the DDN since some of the required introspection tables are
@@ -58,26 +61,6 @@ query GetRepoTables($namespace: String!, $repository: String!) {
 }
 
 
-class TableColumn(NamedTuple):
-    ordinal: int
-    name: str
-    pg_type: str
-    is_pk: bool
-    comment: Optional[str] = None
-
-
-class TableInfo(TypedDict):
-    name: str
-    schema: List[TableColumn]
-
-
-class RepositoryInfo(TypedDict):
-    namespace: str
-    repository: str
-    tables: List[TableInfo]
-    readme: str
-
-
 def graphql_request(operation: str, variables: Dict[Any, Any]) -> Any:
     return requests.post(
         GRAPHQL_API_URL,
@@ -102,63 +85,39 @@ def get_repo_list(namespace: str) -> List[RepositoryInfo]:
         "namespace"
     ]["repositoriesByNamespace"]["nodes"]
     return [
-        {
-            "namespace": namespace,
-            "repository": repo["repository"],
-            "readme": repo["repoProfileByNamespaceAndRepository"]["readme"],
-            "tables": [
-                {
-                    "name": table["tableName"],
-                    "schema": [TableColumn(*column) for column in table["tableSchema"]],
-                }
+        RepositoryInfo(
+            namespace=namespace,
+            repository=repo["repository"],
+            readme=repo["repoProfileByNamespaceAndRepository"]["readme"],
+            tables=[
+                TableInfo(
+                    name=table["tableName"],
+                    columns=[TableColumn(*column) for column in table["tableSchema"]]
+                )
                 for table in repo["latestTables"]["nodes"]
             ],
-        }
+        )
         for repo in repos
     ]
 
 
-def get_repo_tables(namespace: str, repository: str) -> List[TableInfo]:
+def get_repo_tables(namespace: str, repository: str, use_fully_qualified_table_names=False) -> List[TableInfo]:
     return [
-        {
-            "name": table["tableName"],
-            "schema": [TableColumn(*column) for column in table["tableSchema"]],
-        }
+        TableInfo(
+            name=f'"{namespace}/{repository}"."{table["tableName"]}"' if use_fully_qualified_table_names else table["tableName"],
+            columns=[TableColumn(
+                ordinal=column[0],
+                name=column[1],
+                postgresql_type=column[2],
+                is_primary_key=column[3],
+                comment=column[4]
+            ) for column in table["tableSchema"]]
+        )
         for table in graphql_request(
             "GetRepoTables", {"namespace": namespace, "repository": repository}
         )["data"]["repository"]["latestTables"]["nodes"]
     ]
 
-
-class DDNResponseField(BaseModel):
-    name: str
-    tableID: int
-    columnID: int
-    dataTypeID: int
-    dataTypeSize: int
-    dataTypeModifier: int
-    format: str
-    formattedType: str
-
-
-class DDNResponseSuccess(BaseModel):
-    success: Literal[True]
-    command: str
-    rowCount: int
-    rows: List[Dict[str, Any]]
-    fields: List[DDNResponseField]
-    executionTime: str
-    executionTimeHighRes: str
-
-
-class DDNResponseFailure(BaseModel):
-    success: Literal[False]
-    error: str
-
-
-DDNResponse = Annotated[
-    Union[DDNResponseSuccess, DDNResponseFailure], Field(discriminator="success")
-]
 
 DDN_ERROR_PREFIX = "error: "
 
@@ -194,3 +153,6 @@ def prettify_sql(sql: str) -> str:
         return prettify(sql)
     except:
         return sql
+
+def get_table_infos(repositories: List[Tuple[str, str]], use_fully_qualified_table_names=False) -> List[TableInfo]:
+    return list(itertools.chain(*[get_repo_tables(namespace, repository, use_fully_qualified_table_names) for namespace, repository in repositories]))

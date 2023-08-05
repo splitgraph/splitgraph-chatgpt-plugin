@@ -1,8 +1,10 @@
 # from: https://python.langchain.com/en/latest/modules/chains/examples/sqlite.html
 import json
 import pprint
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 from langchain.vectorstores import VectorStore
+
+from .models import FindRelevantTablesResponse
 from .markdown import (
     ddn_resultset_to_markdown,
     get_repository_urls_as_markdown,
@@ -19,17 +21,21 @@ from .gpt import (
     GPTMessageFunction,
     GPTMessageUser,
     continue_gpt_session,
-    generate_gpt_prompt,
+    generate_gpt_prompt
 )
 
 from .persistence import find_repos
 
-from .ddn import (
+from .models import (
     DDNResponse,
     DDNResponseFailure,
     DDNResponseSuccess,
+)
+
+from .ddn import (
     ddn_query,
     prettify_sql,
+    get_table_infos
 )
 
 SUCCESSFUL_RESPONSE_TEMPLATE = """
@@ -193,8 +199,7 @@ def attempt_query(
 
 
 def generate_full_response(
-    question: str, openai_api_key: str, vstore: VectorStore
-) -> str:
-    repositories = find_repos(vstore, question)
-    prompt = generate_gpt_prompt(repositories, question)
-    return attempt_query(openai_api_key, prompt, repositories)
+    prompt: str, vstore: VectorStore
+) -> FindRelevantTablesResponse:
+    repositories = find_repos(vstore, prompt)
+    return FindRelevantTablesResponse(tables=get_table_infos(repositories, use_fully_qualified_table_names=True))

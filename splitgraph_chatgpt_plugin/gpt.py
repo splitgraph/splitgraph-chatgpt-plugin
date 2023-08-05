@@ -6,9 +6,12 @@ from typing import Annotated, Any, List, Literal, Optional, Tuple, Union
 import openai
 from pydantic import BaseModel, Json, Field
 from pydantic.error_wrappers import ValidationError
+
+from .models import TableInfo
 from .markdown import table_info_to_markdown
 from .ddn import get_repo_tables
 import pprint
+
 
 GPT_MODEL = "gpt-4-0613"  # "gpt-3.5-turbo-0613"
 
