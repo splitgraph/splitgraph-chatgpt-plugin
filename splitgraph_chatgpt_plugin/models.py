@@ -1,6 +1,7 @@
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
+
 class TableColumn(BaseModel):
     name: str
     postgresql_type: str
@@ -18,6 +19,7 @@ class RepositoryInfo(BaseModel):
     repository: str
     tables: List[TableInfo]
     readme: str
+
 
 class DDNResponseField(BaseModel):
     name: str
@@ -49,8 +51,10 @@ DDNResponse = Annotated[
     Union[DDNResponseSuccess, DDNResponseFailure], Field(discriminator="success")
 ]
 
+
 class FindRelevantTablesResponse(BaseModel):
     tables: List[TableInfo]
+
 
 class RunSQLResponse(BaseModel):
     error: Optional[str]

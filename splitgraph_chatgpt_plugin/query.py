@@ -20,7 +20,7 @@ from .gpt import (
     GPTMessageFunction,
     GPTMessageUser,
     continue_gpt_session,
-    generate_gpt_prompt
+    generate_gpt_prompt,
 )
 
 from .persistence import find_repos
@@ -31,12 +31,7 @@ from .models import (
     DDNResponseSuccess,
 )
 
-from .ddn import (
-    ddn_query,
-    prettify_sql,
-    get_table_infos,
-    get_query_editor_url
-)
+from .ddn import ddn_query, prettify_sql, get_table_infos, get_query_editor_url
 
 SUCCESSFUL_RESPONSE_TEMPLATE = """
 INFORM the user that the following SQL query was generated to answer their question using the Splitgraph Data Delivery Network.
@@ -161,7 +156,7 @@ def attempt_query(
             openai_api_key, prompt, repositories, None, retries_left - 1
         )
     # DON'T attempt to pretty-print the SQL query using pglast
-    prettified_sql = maybe_sql # prettify_sql(maybe_sql)
+    prettified_sql = maybe_sql  # prettify_sql(maybe_sql)
     # Attempt to run the execute the generated sql query on the DDN
     ddn_response = ddn_query(prettified_sql)
     if isinstance(ddn_response, DDNResponseFailure):
@@ -202,4 +197,6 @@ def generate_full_response(
     prompt: str, vstore: VectorStore
 ) -> FindRelevantTablesResponse:
     repositories = find_repos(vstore, prompt)
-    return FindRelevantTablesResponse(tables=get_table_infos(repositories, use_fully_qualified_table_names=True))
+    return FindRelevantTablesResponse(
+        tables=get_table_infos(repositories, use_fully_qualified_table_names=True)
+    )

@@ -73,8 +73,8 @@ def prepare_repository_info_documents(
     documents = loader.load()
     # add metadata to documents
     for d in documents:
-        d.metadata["namespace"] = repository_info["namespace"]
-        d.metadata["repository"] = repository_info["repository"]
+        d.metadata["namespace"] = repository_info.namespace
+        d.metadata["repository"] = repository_info.repository
     text_splitter = CharacterTextSplitter(
         chunk_size=DOCUMENT_CHUNK_BYTES, chunk_overlap=0
     )

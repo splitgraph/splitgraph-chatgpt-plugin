@@ -1,7 +1,13 @@
 from typing import Any, List, Set, Tuple
 
 from .config import SPLITGRAPH_WWW_URL_PREFIX
-from .models import DDNResponse, DDNResponseSuccess, RepositoryInfo, TableColumn, TableInfo
+from .models import (
+    DDNResponse,
+    DDNResponseSuccess,
+    RepositoryInfo,
+    TableColumn,
+    TableInfo,
+)
 
 
 REPOSITORY_DESCRIPTION = """

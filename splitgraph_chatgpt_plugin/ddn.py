@@ -7,7 +7,14 @@ from pglast import prettify
 
 from .config import SPLITGRAPH_WWW_URL_PREFIX
 
-from .models import DDNResponse, DDNResponseFailure, RepositoryInfo, RunSQLResponse, TableColumn, TableInfo
+from .models import (
+    DDNResponse,
+    DDNResponseFailure,
+    RepositoryInfo,
+    RunSQLResponse,
+    TableColumn,
+    TableInfo,
+)
 import itertools
 
 
@@ -94,7 +101,15 @@ def get_repo_list(namespace: str) -> List[RepositoryInfo]:
             tables=[
                 TableInfo(
                     name=table["tableName"],
-                    columns=[TableColumn(*column) for column in table["tableSchema"]]
+                    columns=[
+                        TableColumn(
+                            name=column[1],
+                            postgresql_type=column[2],
+                            is_primary_key=column[3],
+                            comment=column[4],
+                        )
+                        for column in table["tableSchema"]
+                    ],
                 )
                 for table in repo["latestTables"]["nodes"]
             ],
@@ -103,23 +118,30 @@ def get_repo_list(namespace: str) -> List[RepositoryInfo]:
     ]
 
 
-def get_repo_tables(namespace: str, repository: str, use_fully_qualified_table_names=False) -> List[TableInfo]:
+def get_repo_tables(
+    namespace: str, repository: str, use_fully_qualified_table_names=False
+) -> List[TableInfo]:
     graphql_response = graphql_request(
-            "GetRepoTables", {"namespace": namespace, "repository": repository}
-        )
+        "GetRepoTables", {"namespace": namespace, "repository": repository}
+    )
     # Repositories deleted since the last embedding indexing will return an empty
     # repository in the graphql response.
     if graphql_response["data"]["repository"] is None:
         return []
     return [
         TableInfo(
-            name=f'"{namespace}/{repository}"."{table["tableName"]}"' if use_fully_qualified_table_names else table["tableName"],
-            columns=[TableColumn(
-                name=column[1],
-                postgresql_type=column[2],
-                is_primary_key=column[3],
-                comment=column[4]
-            ) for column in table["tableSchema"]]
+            name=f'"{namespace}/{repository}"."{table["tableName"]}"'
+            if use_fully_qualified_table_names
+            else table["tableName"],
+            columns=[
+                TableColumn(
+                    name=column[1],
+                    postgresql_type=column[2],
+                    is_primary_key=column[3],
+                    comment=column[4],
+                )
+                for column in table["tableSchema"]
+            ],
         )
         for table in graphql_response["data"]["repository"]["latestTables"]["nodes"]
     ]
@@ -160,16 +182,32 @@ def prettify_sql(sql: str) -> str:
     except:
         return sql
 
-def get_table_infos(repositories: List[Tuple[str, str]], use_fully_qualified_table_names=False) -> List[TableInfo]:
-    return list(itertools.chain(*[get_repo_tables(namespace, repository, use_fully_qualified_table_names) for namespace, repository in repositories]))
+
+def get_table_infos(
+    repositories: List[Tuple[str, str]], use_fully_qualified_table_names=False
+) -> List[TableInfo]:
+    return list(
+        itertools.chain(
+            *[
+                get_repo_tables(namespace, repository, use_fully_qualified_table_names)
+                for namespace, repository in repositories
+            ]
+        )
+    )
+
 
 def get_query_editor_url(sql: str) -> str:
     import urllib.parse
 
     return f"{SPLITGRAPH_WWW_URL_PREFIX}query?sqlQuery={urllib.parse.quote_plus(sql)}"
 
-def run_sql(query: str)->RunSQLResponse:
+
+def run_sql(query: str) -> RunSQLResponse:
     ddn_response = ddn_query(query)
     if isinstance(ddn_response, DDNResponseFailure):
-        return RunSQLResponse(error=ddn_response.error, query_editor_url=get_query_editor_url(query))
-    return RunSQLResponse(rows=ddn_response.rows, query_editor_url=get_query_editor_url(query))
+        return RunSQLResponse(
+            error=ddn_response.error, query_editor_url=get_query_editor_url(query)
+        )
+    return RunSQLResponse(
+        rows=ddn_response.rows, query_editor_url=get_query_editor_url(query)
+    )
