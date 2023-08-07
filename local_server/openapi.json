@@ -113,7 +113,6 @@
         "type": "object",
         "required": ["name", "postgresql_type", "is_primary_key"],
         "properties": {
-          "ordinal": {"type": "number"},
           "name": {"type": "string"},
           "postgresql_type": {"type": "string"},
           "is_primary_key": {"type": "boolean"},

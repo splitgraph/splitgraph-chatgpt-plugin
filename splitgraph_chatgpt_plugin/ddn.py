@@ -104,20 +104,24 @@ def get_repo_list(namespace: str) -> List[RepositoryInfo]:
 
 
 def get_repo_tables(namespace: str, repository: str, use_fully_qualified_table_names=False) -> List[TableInfo]:
+    graphql_response = graphql_request(
+            "GetRepoTables", {"namespace": namespace, "repository": repository}
+        )
+    # Repositories deleted since the last embedding indexing will return an empty
+    # repository in the graphql response.
+    if graphql_response["data"]["repository"] is None:
+        return []
     return [
         TableInfo(
             name=f'"{namespace}/{repository}"."{table["tableName"]}"' if use_fully_qualified_table_names else table["tableName"],
             columns=[TableColumn(
-                ordinal=column[0],
                 name=column[1],
                 postgresql_type=column[2],
                 is_primary_key=column[3],
                 comment=column[4]
             ) for column in table["tableSchema"]]
         )
-        for table in graphql_request(
-            "GetRepoTables", {"namespace": namespace, "repository": repository}
-        )["data"]["repository"]["latestTables"]["nodes"]
+        for table in graphql_response["data"]["repository"]["latestTables"]["nodes"]
     ]
 
 

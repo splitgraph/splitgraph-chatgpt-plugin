@@ -2,7 +2,6 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 class TableColumn(BaseModel):
-    ordinal: int
     name: str
     postgresql_type: str
     is_primary_key: bool
