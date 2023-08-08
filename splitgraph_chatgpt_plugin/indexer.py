@@ -67,8 +67,9 @@ def remove_old_embeddings(
 def prepare_repository_info_documents(
     repository_info: RepositoryInfo,
 ) -> List[Document]:
+    repository_info_markdown = repository_info_to_markdown(repository_info)
     loader = UnstructuredMarkdownIOLoader(
-        StringIO(repository_info_to_markdown(repository_info))
+        StringIO(repository_info_markdown)
     )
     documents = loader.load()
     # add metadata to documents

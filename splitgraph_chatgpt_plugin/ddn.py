@@ -99,9 +99,10 @@ def parse_table_column(graphql_table_column: Any) -> TableColumn:
 
 
 def get_repo_list(namespace: str) -> List[RepositoryInfo]:
-    repos = graphql_request("GetNamespaceRepos", {"namespace": namespace})["data"][
-        "namespace"
-    ]["repositoriesByNamespace"]["nodes"]
+    response = graphql_request("GetNamespaceRepos", {"namespace": namespace})
+    if response["data"]["namespace"] is None:
+        # the namespace has been removed
+        return []
     return [
         RepositoryInfo(
             namespace=namespace,
@@ -117,7 +118,7 @@ def get_repo_list(namespace: str) -> List[RepositoryInfo]:
                 for table in repo["latestTables"]["nodes"]
             ],
         )
-        for repo in repos
+        for repo in response["data"]["namespace"]["repositoriesByNamespace"]["nodes"]
     ]
 
 

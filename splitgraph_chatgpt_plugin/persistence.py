@@ -5,7 +5,6 @@ from langchain.vectorstores import VectorStore
 from langchain.vectorstores import PGVector
 from langchain.vectorstores.pgvector import DistanceStrategy
 import sqlalchemy
-import os
 from sqlalchemy.orm import Session
 
 
