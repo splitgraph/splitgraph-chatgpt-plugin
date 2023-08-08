@@ -3,7 +3,6 @@ import json
 from typing import Any, Dict, List, Tuple
 import requests
 from pydantic import parse_obj_as
-from pglast import prettify
 
 from .config import SPLITGRAPH_WWW_URL_PREFIX
 
@@ -16,6 +15,7 @@ from .models import (
     TableInfo,
 )
 import itertools
+import urllib.parse
 
 
 # The constructor of the SQLDatabase base class calls SQLAlchemy's inspect()
@@ -89,6 +89,15 @@ def graphql_request(operation: str, variables: Dict[Any, Any]) -> Any:
     ).json()
 
 
+def parse_table_column(graphql_table_column: Any) -> TableColumn:
+    return TableColumn(
+        name=graphql_table_column[1],
+        postgresql_type=graphql_table_column[2],
+        is_primary_key=graphql_table_column[3],
+        comment=graphql_table_column[4],
+    )
+
+
 def get_repo_list(namespace: str) -> List[RepositoryInfo]:
     repos = graphql_request("GetNamespaceRepos", {"namespace": namespace})["data"][
         "namespace"
@@ -102,13 +111,7 @@ def get_repo_list(namespace: str) -> List[RepositoryInfo]:
                 TableInfo(
                     name=table["tableName"],
                     columns=[
-                        TableColumn(
-                            name=column[1],
-                            postgresql_type=column[2],
-                            is_primary_key=column[3],
-                            comment=column[4],
-                        )
-                        for column in table["tableSchema"]
+                        parse_table_column(column) for column in table["tableSchema"]
                     ],
                 )
                 for table in repo["latestTables"]["nodes"]
@@ -133,15 +136,7 @@ def get_repo_tables(
             name=f'"{namespace}/{repository}"."{table["tableName"]}"'
             if use_fully_qualified_table_names
             else table["tableName"],
-            columns=[
-                TableColumn(
-                    name=column[1],
-                    postgresql_type=column[2],
-                    is_primary_key=column[3],
-                    comment=column[4],
-                )
-                for column in table["tableSchema"]
-            ],
+            columns=[parse_table_column(column) for column in table["tableSchema"]],
         )
         for table in graphql_response["data"]["repository"]["latestTables"]["nodes"]
     ]
@@ -171,18 +166,6 @@ def ddn_query(sql) -> DDNResponse:
     return parsed_response
 
 
-# attempt to prettify sql, leave as-is upon failure
-def prettify_sql(sql: str) -> str:
-    try:
-        # TODO: don't cut table names at 63 characters
-        # Currently, prettify() breaks the query because
-        # splitgraph schema and table names often exceed
-        # 63 characters.
-        return prettify(sql)
-    except:
-        return sql
-
-
 def get_table_infos(
     repositories: List[Tuple[str, str]], use_fully_qualified_table_names=False
 ) -> List[TableInfo]:
@@ -197,8 +180,6 @@ def get_table_infos(
 
 
 def get_query_editor_url(sql: str) -> str:
-    import urllib.parse
-
     return f"{SPLITGRAPH_WWW_URL_PREFIX}query?sqlQuery={urllib.parse.quote_plus(sql)}"
 
 

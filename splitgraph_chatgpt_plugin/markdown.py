@@ -1,9 +1,4 @@
-from typing import Any, List, Set, Tuple
-
-from .config import SPLITGRAPH_WWW_URL_PREFIX
 from .models import (
-    DDNResponse,
-    DDNResponseSuccess,
     RepositoryInfo,
     TableColumn,
     TableInfo,
@@ -65,34 +60,3 @@ def repository_info_to_markdown(repo_info: RepositoryInfo) -> str:
         ),
     )
     return result
-
-
-def print_table_row(row: List[Any]) -> str:
-    return "|" + " |".join([str(e) for e in row]) + " |\n"
-
-
-def ddn_resultset_to_markdown(result: DDNResponseSuccess) -> str:
-    if result.rowCount == 0:
-        return "No rows returned by the DDN in response to the query."
-    column_names_set: Set[str] = set()
-    for field in result.fields:
-        column_names_set.add(field.name)
-    column_names = sorted(column_names_set)
-    response = print_table_row(column_names)
-    response += print_table_row(["---" for _ in column_names])
-    for row in result.rows:
-        response += print_table_row([row.get(c, "") for c in column_names])
-    return response
-
-
-def ddn_response_to_markdown(response: DDNResponse) -> str:
-    if isinstance(response, DDNResponseSuccess):
-        return ddn_resultset_to_markdown(response)
-    return f"An error occurred while attempting to execute the query: {response.error}"
-
-
-def get_repository_urls_as_markdown(repositories: List[Tuple[str, str]]) -> List[str]:
-    return [
-        f"* [{namespace}/{repository}]({SPLITGRAPH_WWW_URL_PREFIX}{namespace}/{repository})"
-        for namespace, repository in repositories
-    ]

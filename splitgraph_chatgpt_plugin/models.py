@@ -57,6 +57,6 @@ class FindRelevantTablesResponse(BaseModel):
 
 
 class RunSQLResponse(BaseModel):
-    error: Optional[str]
-    rows: Optional[List[Any]]
+    error: Optional[str] = None
+    rows: Optional[List[Any]] = None
     query_editor_url: str
