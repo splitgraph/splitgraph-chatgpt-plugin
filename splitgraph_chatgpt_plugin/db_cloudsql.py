@@ -4,6 +4,7 @@ from google.cloud.sql.connector import Connector, IPTypes
 import pg8000
 
 import sqlalchemy
+from .persistence import CLOUDSQL_PG_CONN_STR
 
 # based on https://github.com/GoogleCloudPlatform/python-docs-samples/blob/main/cloud-sql/postgres/sqlalchemy/connect_connector.py
 
@@ -26,7 +27,7 @@ def connect_with_connector() -> sqlalchemy.engine.base.Engine:
     db_pass = os.environ["DB_PASS"]  # e.g. 'my-db-password'
     db_name = os.environ["DB_NAME"]  # e.g. 'my-database'
 
-    ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
+    ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") == "1" else IPTypes.PUBLIC
 
     # initialize Cloud SQL Python Connector object
     connector = Connector()
@@ -45,7 +46,7 @@ def connect_with_connector() -> sqlalchemy.engine.base.Engine:
     # The Cloud SQL Python Connector can be used with SQLAlchemy
     # using the 'creator' argument to 'create_engine'
     pool = sqlalchemy.create_engine(
-        "postgresql+pg8000://",
+        CLOUDSQL_PG_CONN_STR,
         creator=getconn,
         # [START_EXCLUDE]
         # Pool size is the maximum number of permanent connections to keep.

@@ -7,6 +7,7 @@ from langchain.vectorstores.pgvector import DistanceStrategy
 import sqlalchemy
 from sqlalchemy.orm import Session
 
+CLOUDSQL_PG_CONN_STR="postgresql+pg8000://"
 
 def create_pgvector_index(db: PGVector, max_elements: int):
     create_index_query = sqlalchemy.text(
@@ -92,5 +93,8 @@ def find_repos(vstore: VectorStore, query: str, limit=4) -> List[Tuple[str, str]
 
 
 def connect(connection_string: str) -> sqlalchemy.engine.Connection:
+    if connection_string == CLOUDSQL_PG_CONN_STR:
+        from .db_cloudsql import connect_with_connector
+        return connect_with_connector()
     engine = sqlalchemy.create_engine(connection_string)
     return engine.connect()
