@@ -9,9 +9,9 @@
   },
   "api": {
     "type": "openapi",
-    "url": "http://localhost:3333/.well-known/openapi.json"
+    "url": "https://chatgpt.splitgraph.io/.well-known/openapi.json"
   },
-  "logo_url": "http://localhost:3333/.well-known/logo.png",
+  "logo_url": "https://chatgpt.splitgraph.io/.well-known/logo.png",
   "contact_email": "hello@splitgraph.com",
   "legal_info_url": "https://www.splitgraph.com"
 }
