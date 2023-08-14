@@ -15,10 +15,11 @@ from unstructured.__version__ import __version__ as __unstructured_version__  # 
 from unstructured.partition.md import partition_md  # type: ignore
 from splitgraph_chatgpt_plugin.config import DOCUMENT_COLLECTION_NAME
 
-from .persistence import connect, get_embedding_store
+from .persistence import connect, get_embedding_store_pgvector
 from .ddn import get_repo_list, RepositoryInfo
 from .markdown import repository_info_to_markdown
 from .config import get_db_connection_string, get_openai_api_key
+from contextlib import closing
 
 EMBEDDING_CHUNK_SIZE = 50
 DOCUMENT_CHUNK_BYTES = 1000
@@ -50,18 +51,17 @@ class UnstructuredMarkdownIOLoader(UnstructuredFileIOLoader):
 
 
 def remove_old_embeddings(
-    collection: str, connection_string: str, docs: List[Document]
+    connection: sqlalchemy.engine.Connection, collection: str, docs: List[Document]
 ) -> None:
-    with connect(connection_string) as connection:
-        for doc in docs:
-            stmt = sqlalchemy.text(DELETE_OLD_EMBEDDINGS_QUERY)
-            stmt = stmt.bindparams(
-                collection=collection,
-                namespace=doc.metadata["namespace"],
-                repository=doc.metadata["repository"],
-            )
-            connection.execute(stmt)
-        connection.commit()
+    for doc in docs:
+        stmt = sqlalchemy.text(DELETE_OLD_EMBEDDINGS_QUERY)
+        stmt = stmt.bindparams(
+            collection=collection,
+            namespace=doc.metadata["namespace"],
+            repository=doc.metadata["repository"],
+        )
+        connection.execute(stmt)
+    connection.commit()
 
 
 def prepare_repository_info_documents(
@@ -87,21 +87,21 @@ def main() -> None:
     repo_index_limit = None
     collection = DOCUMENT_COLLECTION_NAME
     namespace = sys.argv[1]
-    connection_string = get_db_connection_string()
-    vstore = get_embedding_store(
-        collection, connection_string, get_openai_api_key(), 100000
-    )
-    print(f"Indexing repositories in namespace {namespace}")
-    repo_list = get_repo_list(namespace)
-    repository_info_documents: List[Document] = []
-    for repo_info in repo_list[0:repo_index_limit]:
-        repository_info_documents.extend(prepare_repository_info_documents(repo_info))
-    print(
-        f"Calculating embeddings for {len(repository_info_documents)} documents, {EMBEDDING_CHUNK_SIZE} at a time"
-    )
-    for chunk in chunked(repository_info_documents, EMBEDDING_CHUNK_SIZE):
-        remove_old_embeddings(collection, connection_string, chunk)
-        vstore.add_documents(chunk)
+    with closing(connect(get_db_connection_string())) as connection:
+        vstore = get_embedding_store_pgvector(
+            connection, collection, get_openai_api_key()
+        )
+        print(f"Indexing repositories in namespace {namespace}")
+        repo_list = get_repo_list(namespace)
+        repository_info_documents: List[Document] = []
+        for repo_info in repo_list[0:repo_index_limit]:
+            repository_info_documents.extend(prepare_repository_info_documents(repo_info))
+        print(
+            f"Calculating embeddings for {len(repository_info_documents)} documents, {EMBEDDING_CHUNK_SIZE} at a time"
+        )
+        for chunk in chunked(repository_info_documents, EMBEDDING_CHUNK_SIZE):
+            remove_old_embeddings(connection, collection, chunk)
+            vstore.add_documents(chunk)
 
 
 main()

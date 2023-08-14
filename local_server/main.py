@@ -15,7 +15,7 @@ from splitgraph_chatgpt_plugin.config import (
 from splitgraph_chatgpt_plugin.ddn import get_table_infos, run_sql as _run_sql
 from splitgraph_chatgpt_plugin.models import FindRelevantTablesResponse, RunSQLResponse
 
-from splitgraph_chatgpt_plugin.persistence import find_repos, get_embedding_store
+from splitgraph_chatgpt_plugin.persistence import connect, find_repos, get_embedding_store_pgvector
 from langchain.vectorstores import VectorStore
 
 app = FastAPI()
@@ -58,7 +58,7 @@ async def get_openapi(request):
 
 
 @app.get("/find_relevant_tables", response_model=FindRelevantTablesResponse)
-async def find_relevant_tables(prompt: str | None = None):
+async def find_relevant_tables(prompt: Optional[str] = None):
     global vstore
     try:
         if prompt is None:
@@ -77,7 +77,7 @@ async def find_relevant_tables(prompt: str | None = None):
 
 
 @app.get("/run_sql", response_model=RunSQLResponse)
-async def run_sql(query: str | None = None):
+async def run_sql(query: Optional[str] = None):
     global vstore
     try:
         if query is None:
@@ -96,8 +96,8 @@ async def startup():
     global openai_api_key
     global vstore
     openai_api_key = get_openai_api_key()
-    vstore = get_embedding_store(
-        DOCUMENT_COLLECTION_NAME, get_db_connection_string(), openai_api_key
+    vstore = get_embedding_store_pgvector(
+        connect(get_db_connection_string()), DOCUMENT_COLLECTION_NAME, openai_api_key
     )
 
 

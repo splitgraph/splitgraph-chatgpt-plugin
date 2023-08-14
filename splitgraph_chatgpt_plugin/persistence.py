@@ -1,5 +1,5 @@
 from math import ceil, sqrt
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import VectorStore
 from langchain.vectorstores import PGVector
@@ -8,6 +8,19 @@ import sqlalchemy
 from sqlalchemy.orm import Session
 
 CLOUDSQL_PG_CONN_STR="postgresql+pg8000://"
+
+class PGVectorReuseConnection(PGVector):
+
+    _conn: Optional[sqlalchemy.engine.Connection] = None
+
+    def __init__(self, connection: sqlalchemy.engine.Connection, *args, **kwargs):
+        self._conn = connection
+        super().__init__(*args, connection_string="thisisignored", **kwargs)
+
+    def connect(self) -> sqlalchemy.engine.Connection:
+        if self._conn:
+            return self._conn
+        return super().connect()
 
 def create_pgvector_index(db: PGVector, max_elements: int):
     create_index_query = sqlalchemy.text(
@@ -30,55 +43,20 @@ def create_pgvector_index(db: PGVector, max_elements: int):
 
 
 def get_embedding_store_pgvector(
-    collection: str, connection_string: str, openai_api_key: str, max_elements: int
+    connection: sqlalchemy.engine.Connection, collection: str, openai_api_key: str, max_elements: int = 100000
 ) -> VectorStore:
     # description: https://supabase.com/blog/openai-embeddings-postgres-vector
 
-    db = PGVector(
+    db = PGVectorReuseConnection(
+        connection,
         # MyPy chokes on this, see: https://github.com/langchain-ai/langchain/issues/2925
         embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key),  # type: ignore
         collection_name=collection,
-        connection_string=connection_string,
         distance_strategy=DistanceStrategy.COSINE,
     )
     # create index
     create_pgvector_index(db, max_elements)
     return db
-
-
-def get_embedding_store_pgembedding(
-    collection: str, connection_string: str, openai_api_key: str, max_elements: int
-) -> VectorStore:
-    # description: https://neon.tech/blog/pg-embedding-extension-for-vector-search
-    from langchain.vectorstores import PGEmbedding
-
-    db = PGEmbedding(
-        embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key),  # type: ignore
-        collection_name=collection,
-        connection_string=connection_string,
-    )
-    # attempt to create index if it does not yet exist
-    db.create_hnsw_index(
-        max_elements=max_elements, dims=1536, m=8, ef_construction=16, ef_search=16
-    )
-    return db
-
-
-def get_embedding_store(
-    collection: str,
-    connection_string: str,
-    openai_api_key: str,
-    max_elements=10000,
-    use_pgembedding=False,
-) -> VectorStore:
-    if use_pgembedding:
-        return get_embedding_store_pgembedding(
-            collection, connection_string, openai_api_key, max_elements
-        )
-    return get_embedding_store_pgvector(
-        collection, connection_string, openai_api_key, max_elements
-    )
-
 
 def find_repos(vstore: VectorStore, query: str, limit=4) -> List[Tuple[str, str]]:
     results = vstore.similarity_search_with_score(query, limit)
@@ -95,6 +73,6 @@ def find_repos(vstore: VectorStore, query: str, limit=4) -> List[Tuple[str, str]
 def connect(connection_string: str) -> sqlalchemy.engine.Connection:
     if connection_string == CLOUDSQL_PG_CONN_STR:
         from .db_cloudsql import connect_with_connector
-        return connect_with_connector()
+        return connect_with_connector().connect()
     engine = sqlalchemy.create_engine(connection_string)
     return engine.connect()
