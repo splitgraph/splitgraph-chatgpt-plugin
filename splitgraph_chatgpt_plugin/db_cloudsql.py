@@ -66,4 +66,3 @@ def connect_with_connector() -> sqlalchemy.engine.base.Engine:
         # [END_EXCLUDE]
     )
     return pool
-

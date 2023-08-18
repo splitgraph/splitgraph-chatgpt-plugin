@@ -15,5 +15,5 @@ python -m unittest
 
 # Running the plugin locally
 ```bash
-OPENAI_API_KEY="sk-..." PG_CONN_STR='postgresql://...' python3 -m local_server.main
+OPENAI_API_KEY="sk-..." PG_CONN_STR='postgresql://...' python3 -m server.main
 ```

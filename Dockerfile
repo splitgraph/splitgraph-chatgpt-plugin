@@ -28,4 +28,4 @@ COPY . ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # As an example here we're running the web service with 2 workers on uvicorn.
-CMD exec uvicorn local_server.main:app --host 0.0.0.0 --port ${PORT} --workers 2
+CMD exec uvicorn server.main:app --host 0.0.0.0 --port ${PORT} --workers 2

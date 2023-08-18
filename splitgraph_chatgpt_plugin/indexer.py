@@ -68,9 +68,7 @@ def prepare_repository_info_documents(
     repository_info: RepositoryInfo,
 ) -> List[Document]:
     repository_info_markdown = repository_info_to_markdown(repository_info)
-    loader = UnstructuredMarkdownIOLoader(
-        StringIO(repository_info_markdown)
-    )
+    loader = UnstructuredMarkdownIOLoader(StringIO(repository_info_markdown))
     documents = loader.load()
     # add metadata to documents
     for d in documents:
@@ -95,7 +93,9 @@ def main() -> None:
         repo_list = get_repo_list(namespace)
         repository_info_documents: List[Document] = []
         for repo_info in repo_list[0:repo_index_limit]:
-            repository_info_documents.extend(prepare_repository_info_documents(repo_info))
+            repository_info_documents.extend(
+                prepare_repository_info_documents(repo_info)
+            )
         print(
             f"Calculating embeddings for {len(repository_info_documents)} documents, {EMBEDDING_CHUNK_SIZE} at a time"
         )

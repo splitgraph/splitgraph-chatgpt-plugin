@@ -7,7 +7,8 @@ from langchain.vectorstores.pgvector import DistanceStrategy
 import sqlalchemy
 from sqlalchemy.orm import Session
 
-CLOUDSQL_PG_CONN_STR="postgresql+pg8000://"
+CLOUDSQL_PG_CONN_STR = "postgresql+pg8000://"
+
 
 class PGVectorReuseConnection(PGVector):
 
@@ -21,6 +22,7 @@ class PGVectorReuseConnection(PGVector):
         if self._conn:
             return self._conn
         return super().connect()
+
 
 def create_pgvector_index(db: PGVector, max_elements: int):
     create_index_query = sqlalchemy.text(
@@ -43,7 +45,10 @@ def create_pgvector_index(db: PGVector, max_elements: int):
 
 
 def get_embedding_store_pgvector(
-    connection: sqlalchemy.engine.Connection, collection: str, openai_api_key: str, max_elements: int = 100000
+    connection: sqlalchemy.engine.Connection,
+    collection: str,
+    openai_api_key: str,
+    max_elements: int = 100000,
 ) -> VectorStore:
     # description: https://supabase.com/blog/openai-embeddings-postgres-vector
 
@@ -57,6 +62,7 @@ def get_embedding_store_pgvector(
     # create index
     create_pgvector_index(db, max_elements)
     return db
+
 
 def find_repos(vstore: VectorStore, query: str, limit=4) -> List[Tuple[str, str]]:
     results = vstore.similarity_search_with_score(query, limit)
@@ -73,6 +79,7 @@ def find_repos(vstore: VectorStore, query: str, limit=4) -> List[Tuple[str, str]
 def connect(connection_string: str) -> sqlalchemy.engine.Connection:
     if connection_string == CLOUDSQL_PG_CONN_STR:
         from .db_cloudsql import connect_with_connector
+
         return connect_with_connector().connect()
     engine = sqlalchemy.create_engine(connection_string)
     return engine.connect()

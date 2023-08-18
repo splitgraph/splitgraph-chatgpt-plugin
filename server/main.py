@@ -15,7 +15,11 @@ from splitgraph_chatgpt_plugin.config import (
 from splitgraph_chatgpt_plugin.ddn import get_table_infos, run_sql as _run_sql
 from splitgraph_chatgpt_plugin.models import FindRelevantTablesResponse, RunSQLResponse
 
-from splitgraph_chatgpt_plugin.persistence import connect, find_repos, get_embedding_store_pgvector
+from splitgraph_chatgpt_plugin.persistence import (
+    connect,
+    find_repos,
+    get_embedding_store_pgvector,
+)
 from langchain.vectorstores import VectorStore
 
 app = FastAPI()
@@ -39,7 +43,7 @@ vstore: Optional[VectorStore] = None
 
 @app.route("/.well-known/ai-plugin.json")
 async def get_manifest(request):
-    file_path = "./local_server/ai-plugin.json"
+    file_path = "./server/ai-plugin.json"
     simple_headers = {}
     simple_headers["Access-Control-Allow-Private-Network"] = "true"
     return FileResponse(file_path, media_type="text/json", headers=simple_headers)
@@ -47,13 +51,13 @@ async def get_manifest(request):
 
 @app.route("/.well-known/logo.png")
 async def get_logo(request):
-    file_path = "./local_server/logo.png"
+    file_path = "./server/logo.png"
     return FileResponse(file_path, media_type="image/png")
 
 
 @app.route("/.well-known/openapi.json")
 async def get_openapi(request):
-    file_path = "./local_server/openapi.json"
+    file_path = "./server/openapi.json"
     return FileResponse(file_path, media_type="text/json")
 
 
@@ -66,7 +70,9 @@ async def find_relevant_tables(prompt: Optional[str] = None):
         if vstore is not None:
             repositories = find_repos(vstore, prompt)
             return FindRelevantTablesResponse(
-                tables=get_table_infos(repositories, use_fully_qualified_table_names=True)
+                tables=get_table_infos(
+                    repositories, use_fully_qualified_table_names=True
+                )
             )
         raise Exception("vstore uninitialized")
     except Exception as e:
@@ -102,7 +108,7 @@ async def startup():
 
 
 def start():
-    uvicorn.run("local_server.main:app", host="localhost", port=PORT, reload=True)
+    uvicorn.run("server.main:app", host="localhost", port=PORT, reload=True)
 
 
 if __name__ == "__main__":
