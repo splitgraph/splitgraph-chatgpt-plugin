@@ -6,9 +6,9 @@
   "description_for_human": "Search thousands of public datasets available on the Splitgraph Data Delivery Network",
   "auth": {
     "type": "oauth",
-    "client_url": "https://chatgpt.splitgraph.com/auth/init_auth_flow",
+    "client_url": "https://chatgpt.splitgraph.io/auth/init_auth_flow",
     "scope": "email",
-    "authorization_url": "https://chatgpt.splitgraph.com/auth/oauth_exchange",
+    "authorization_url": "https://chatgpt.splitgraph.io/auth/oauth_exchange",
     "authorization_content_type": "application/json",
     "verification_tokens": {"openai":"6dacb7835e554a4fa59dd011d2e28066"}
   },
