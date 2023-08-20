@@ -7,10 +7,10 @@
   "auth": {
     "type": "oauth",
     "client_url": "https://chatgpt.splitgraph.io/auth/init_auth_flow",
-    "scope": "email",
+    "scope": "openid profile email",
     "authorization_url": "https://chatgpt.splitgraph.io/auth/oauth_exchange",
     "authorization_content_type": "application/json",
-    "verification_tokens": {"openai":"6dacb7835e554a4fa59dd011d2e28066"}
+    "verification_tokens": {"openai":"e290354b568f4de5a76a2c810b8fb447"}
   },
   "api": {
     "type": "openapi",

@@ -162,3 +162,4 @@ venv/
 .vscode/
 service-account-key.json
 env.sh
+deploy.sh

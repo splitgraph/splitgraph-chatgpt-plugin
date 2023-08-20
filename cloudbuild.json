@@ -1,0 +1,21 @@
+{
+    "steps": [
+    {
+        "name": "gcr.io/cloud-builders/docker",
+        "entrypoint": "bash",
+        "args": ["-c", "docker pull gcr.io/splitgraph-chatgpt-plugin/splitgraph-chatgpt-plugin:latest || exit 0"]
+    },
+    {
+        "name": "gcr.io/cloud-builders/docker",
+        "args": [
+            "build",
+            "-t",
+            "gcr.io/splitgraph-chatgpt-plugin/splitgraph-chatgpt-plugin:latest",
+            "--cache-from",
+            "gcr.io/splitgraph-chatgpt-plugin/splitgraph-chatgpt-plugin:latest",
+            "."
+        ]
+    }
+    ],
+    "images": ["gcr.io/splitgraph-chatgpt-plugin/splitgraph-chatgpt-plugin:latest"]
+}
