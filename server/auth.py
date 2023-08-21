@@ -8,6 +8,9 @@ import requests
 from google.oauth2 import id_token
 import google.auth.transport
 from datetime import datetime, timezone, timedelta
+from fastapi import Request, HTTPException
+from fastapi.security.utils import get_authorization_scheme_param
+
 
 from splitgraph_chatgpt_plugin.config import (
     GOOGLE_AUTH_FLOW_COMPLETE_PATH,
@@ -37,18 +40,20 @@ class GoogleIDTokenPayload(BaseModel):
     family_name: Optional[str]
     locale: Optional[str]  # eg: "en"
 
+
 class GoogleAuthResult(BaseModel):
     access_token: str
     refresh_token: Optional[str]
     id_token_payload: GoogleIDTokenPayload
 
+
 TokenGrant = Literal["code", "access", "refresh"]
+
 
 class PluginTokenPayload(BaseModel):
     sub: str
     iss: str
     aud: str
-    sub: str
     iat: int
     exp: int
     nbf: int
@@ -70,15 +75,17 @@ class OpenAIAuthorizationRefreshRequest(BaseModel):
     client_id: str
     client_secret: str
 
+
 OpenAIAuthorizationRequest = Annotated[
-    Union[OpenAIAuthorizationCodeRequest, OpenAIAuthorizationRefreshRequest], Field(discriminator="grant_type")
+    Union[OpenAIAuthorizationCodeRequest, OpenAIAuthorizationRefreshRequest],
+    Field(discriminator="grant_type"),
 ]
 
-def parse_openai_authorization_request(request:Dict[str, str])->OpenAIAuthorizationRequest:
-    return parse_obj_as(
-        OpenAIAuthorizationRequest,  # type: ignore
-        request
-    )
+
+def parse_openai_authorization_request(
+    request: Dict[str, str]
+) -> OpenAIAuthorizationRequest:
+    return parse_obj_as(OpenAIAuthorizationRequest, request)  # type: ignore
 
 
 # source: https://platform.openai.com/docs/plugins/authentication/oauth
@@ -137,7 +144,7 @@ def parse_id_token(id_token_str, client_id) -> Dict[str, str]:
 def get_google_auth_result(
     code: str, client_id: str, client_secret: str
 ) -> GoogleAuthResult:
-    response:Dict[str, str] = requests.post(
+    response: Dict[str, str] = requests.post(
         "https://oauth2.googleapis.com/token",
         data={
             "code": code,
@@ -151,25 +158,55 @@ def get_google_auth_result(
     assert response["token_type"] == "Bearer"
     parsed_id_token = parse_id_token(response["id_token"], client_id)
     return GoogleAuthResult(
-        access_token=response.get('access_token'),
-        refresh_token=response.get('refresh_token'),
-        id_token_payload=GoogleIDTokenPayload.parse_obj(parsed_id_token)
+        access_token=response.get("access_token"),
+        refresh_token=response.get("refresh_token"),
+        id_token_payload=GoogleIDTokenPayload.parse_obj(parsed_id_token),
     )
 
 
-def encode_jwt_token(sub:str, email:str, grant:TokenGrant, expiration=JWT_ACCESS_TOKEN_LIFETIME_SECONDS, creation_timestamp:Optional[datetime]=None, aud=get_oauth_client_id_openai(), secret=get_plugin_jwt_secret()) -> str:
+def encode_jwt_token(
+    sub: str,
+    email: str,
+    grant: TokenGrant,
+    expiration=JWT_ACCESS_TOKEN_LIFETIME_SECONDS,
+    creation_timestamp: Optional[datetime] = None,
+    aud=get_oauth_client_id_openai(),
+    secret=get_plugin_jwt_secret(),
+) -> str:
     now = creation_timestamp or datetime.now(tz=timezone.utc)
     payload = PluginTokenPayload(
         sub=sub,
         iss=PLUGIN_DOMAIN,
         aud=aud,
         iat=now.timestamp(),
-        exp=(now+timedelta(seconds=expiration)).timestamp(),
-        nbf=(now+timedelta(seconds=-2)).timestamp(),
+        exp=(now + timedelta(seconds=expiration)).timestamp(),
+        nbf=(now + timedelta(seconds=-2)).timestamp(),
         grant=grant,
-        email=email
+        email=email,
     )
     return jwt.encode(payload=payload.dict(), key=secret, algorithm="HS256")
 
-def decode_jwt_token(token:str, aud=get_oauth_client_id_openai(), secret=get_plugin_jwt_secret()) -> PluginTokenPayload:
-    return PluginTokenPayload.parse_obj(jwt.decode(token, key=secret, audience=aud, issuer=PLUGIN_DOMAIN, algorithms=["HS256"]))
+
+def decode_jwt_token(
+    token: str, aud=get_oauth_client_id_openai(), secret=get_plugin_jwt_secret()
+) -> PluginTokenPayload:
+    return PluginTokenPayload.parse_obj(
+        jwt.decode(
+            token, key=secret, audience=aud, issuer=PLUGIN_DOMAIN, algorithms=["HS256"]
+        )
+    )
+
+
+# inspired by: https://testdriven.io/blog/fastapi-jwt-auth/
+def assert_authorized(request: Request) -> PluginTokenPayload:
+    authorization = request.headers.get("Authorization")
+    if not authorization:
+        raise HTTPException(status_code=403, detail="Missing Authorization header.")
+    scheme, token = get_authorization_scheme_param(authorization)
+    if not scheme == "Bearer":
+        raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
+    try:
+        return decode_jwt_token(token)
+    except Exception as e:
+        print(str(e))
+        raise HTTPException(status_code=403, detail="Invalid token or expired token.")

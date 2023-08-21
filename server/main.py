@@ -11,8 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth import (
     OAuthContext,
     OpenAIAuthorizationResponse,
+    assert_authorized,
     decode_jwt_token,
-    deserialize_auth_context,
     get_google_auth_result,
     get_google_sign_in_url,
     get_openai_oauth_callback_url,
@@ -30,7 +30,6 @@ from splitgraph_chatgpt_plugin.config import (
     get_oauth_client_secret_google,
     get_openai_api_key,
     get_db_connection_string,
-    get_plugin_jwt_secret,
 )
 from splitgraph_chatgpt_plugin.ddn import get_table_infos, run_sql as _run_sql
 from splitgraph_chatgpt_plugin.models import FindRelevantTablesResponse, RunSQLResponse
@@ -61,6 +60,10 @@ app.add_middleware(
 vstore: Optional[VectorStore] = None
 
 
+def get_converation_id(info: Request) -> Optional[str]:
+    return info.headers.get("openai-conversation-id")
+
+
 @app.route("/.well-known/ai-plugin.json")
 async def get_manifest(request):
     file_path = "./server/ai-plugin.json"
@@ -82,8 +85,12 @@ async def get_openapi(request):
 
 
 @app.get("/find_relevant_tables", response_model=FindRelevantTablesResponse)
-async def find_relevant_tables(prompt: Optional[str] = None):
+async def find_relevant_tables(info: Request, prompt: Optional[str] = None):
     global vstore
+    jwt_payload = assert_authorized(info)
+    print(
+        f"find_relevant_tables {jwt_payload.email} {get_converation_id(info)} {prompt}"
+    )
     try:
         if prompt is None:
             raise Exception("Prompt is None")
@@ -103,8 +110,10 @@ async def find_relevant_tables(prompt: Optional[str] = None):
 
 
 @app.get("/run_sql", response_model=RunSQLResponse)
-async def run_sql(query: Optional[str] = None):
+async def run_sql(info: Request, query: Optional[str] = None):
     global vstore
+    jwt_payload = assert_authorized(info)
+    print(f"run_sql {jwt_payload.email} {get_converation_id(info)} {query}")
     try:
         if query is None:
             raise Exception("No sql query provided")
@@ -170,7 +179,7 @@ async def oauth_callback_from_google(code: str, state: str):
 async def oauth_exchange(info: Request):
     raw_body = await info.json()
     print(raw_body)
-    raw_body['grant_type'] = raw_body.get('grant_type', 'authorization_code')
+    raw_body["grant_type"] = raw_body.get("grant_type", "authorization_code")
     request = parse_openai_authorization_request(raw_body)
     if request.grant_type == "authorization_code":
         code_payload = decode_jwt_token(request.code)
@@ -206,6 +215,7 @@ async def oauth_exchange(info: Request):
         expires_in=JWT_ACCESS_TOKEN_LIFETIME_SECONDS,
     )
     # TODO: if refresh token has expired
+
 
 @app.on_event("startup")
 async def startup():
